@@ -1,4 +1,12 @@
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
 using namespace std;
 
 struct Pos { int r, c; };
@@ -28,11 +36,18 @@ static inline bool inBounds(int r,int c,int R,int C){
 
 static bool matchFrom(const vector<string>& g, const string& w,
                       int r,int c,int dr,int dc, vector<Pos>& path){
-    const int R=(int)g.size(), C=(int)g[0].size();
+    const int R = (int)g.size();
+    const int C = (int)g[0].size();
     path.clear();
+
+    // Otimização: verifica se a última letra ainda cabe no grid
+    int end_r = r + (int(w.size()) - 1) * dr;
+    int end_c = c + (int(w.size()) - 1) * dc;
+    if (!inBounds(end_r, end_c, R, C)) return false;
+
     for(int i=0;i<(int)w.size();++i){
         int rr=r+i*dr, cc=c+i*dc;
-        if(!inBounds(rr,cc,R,C) || g[rr][cc]!=w[i]) return false;
+        if(g[rr][cc]!=w[i]) return false;
         path.push_back({rr,cc});
     }
     return true;
@@ -45,13 +60,16 @@ static string dirName(int dr,int dc){
 }
 
 static Found findWord(const vector<string>& gridLower, const string& wLower){
-    const int R=(int)gridLower.size(), C=(int)gridLower[0].size();
+    const int R=(int)gridLower.size();
+    const int C=(int)gridLower[0].size();
+
     Found ans; ans.word = wLower;
     string wRev = wLower; reverse(wRev.begin(), wRev.end());
 
     for(int r=0;r<R;++r){
         for(int c=0;c<C;++c){
-            if(gridLower[r][c]!=wLower[0] && gridLower[r][c]!=wRev[0]) continue;
+            char ch = gridLower[r][c];
+            if(ch!=wLower[0] && ch!=wRev[0]) continue;
 
             for (auto& d : DIRS){
                 vector<Pos> path;
@@ -77,13 +95,15 @@ static Found findWord(const vector<string>& gridLower, const string& wLower){
 
 // Lê: R C, depois R linhas, depois palavras (uma por linha ou separadas por espaço)
 static bool readSingleFile(istream& in, vector<string>& grid, vector<string>& words){
-    int R,C; if(!(in>>R>>C)) return false;
+    int R,C; 
+    if(!(in>>R>>C)) return false;
     string line; getline(in,line); // consome resto
     grid.clear(); words.clear();
 
     for(int i=0;i<R;++i){
         if(!getline(in,line)) return false;
-        line.erase(remove_if(line.begin(), line.end(), ::isspace), line.end());
+        // remove todos os espaços em branco
+        line.erase(remove_if(line.begin(), line.end(), [](unsigned char ch){return std::isspace(ch)!=0;}), line.end());
         if((int)line.size()!=C) return false;
         grid.push_back(line);
     }
@@ -102,9 +122,12 @@ static bool readSingleFile(istream& in, vector<string>& grid, vector<string>& wo
 // Lê dois arquivos: grade (R C + R linhas) e lista (uma por linha)
 static bool readTwoFiles(const string& gridFile,const string& wordsFile,
                          vector<string>& grid, vector<string>& words){
-    ifstream ig(gridFile); if(!ig) return false;
-    if(!readSingleFile(ig, grid, words)) return false; // pega grade
+    ifstream ig(gridFile);
+    if(!ig) return false;
+    // Lê apenas a grade do primeiro arquivo
+    if(!readSingleFile(ig, grid, words)) return false;
 
+    // Lê palavras do segundo arquivo (se existir)
     ifstream iw(wordsFile);
     if(iw){
         words.clear();
@@ -126,65 +149,77 @@ int main(int argc, char** argv){
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
 
+    if (argc>=2 && std::string(argv[1])=="--help") {
+        cerr << "Uso:\n"
+             << "  " << argv[0] << "                (le de stdin: R C, R linhas da grade e depois palavras)\n"
+             << "  " << argv[0] << " arquivo.txt     (R C + grade + palavras no mesmo arquivo)\n"
+             << "  " << argv[0] << " grade.txt palavras.txt\n";
+        return 0;
+    }
+
     vector<string> grid, words;
     if(argc==1){
         if(!readSingleFile(cin, grid, words)){
-            cerr<<"Erro ao ler entrada do stdin.\n"; return 1;
+            cerr<<"Erro ao ler entrada do stdin.\n"; 
+            return 1;
         }
     }else if(argc==2){
         ifstream in(argv[1]);
         if(!in || !readSingleFile(in, grid, words)){
-            cerr<<"Erro ao ler arquivo: "<<argv[1]<<"\n"; return 1;
+            cerr<<"Erro ao ler arquivo: "<<argv[1]<<"\n"; 
+            return 1;
         }
     }else{
         if(!readTwoFiles(argv[1], argv[2], grid, words)){
-            cerr<<"Erro ao ler arquivos: "<<argv[1]<<" e/ou "<<argv[2]<<"\n"; return 1;
+            cerr<<"Erro ao ler arquivos: "<<argv[1]<<" e/ou "<<argv[2]<<"\n"; 
+            return 1;
         }
     }
 
-    const int R=(int)grid.size(), C=(int)grid[0].size();
+    // Robustez: checa grid
+    if (grid.empty() || grid[0].empty()){
+        cerr << "Erro: grade vazia ou dimensoes invalidas.\n";
+        return 1;
+    }
+
+    const int R=(int)grid.size();
+    const int C=(int)grid[0].size();
 
     // grade minúscula
     vector<string> gridLower = grid;
-    for(auto& row: gridLower) for(char& ch: row) ch=(char)tolower((unsigned char)ch);
+    for(auto& row: gridLower) 
+        for(char& ch: row) ch=(char)tolower((unsigned char)ch);
 
     // preserva originais e normaliza minúsculas
     vector<string> wordsOrig = words;
     for(auto& w: words){
-        string t; for(char ch:w) if(!isspace((unsigned char)ch)) t.push_back((char)tolower((unsigned char)ch));
+        string t; 
+        for(char ch:w) if(!isspace((unsigned char)ch)) t.push_back((char)tolower((unsigned char)ch));
         w = t;
     }
 
-    // --- filtros para eliminar o "fantasma : nao encontrada" ---
+    // --- filtros seguros ---
     // 1) remove palavras vazias
     {
         vector<string> w2, wo2;
+        w2.reserve(words.size()); wo2.reserve(wordsOrig.size());
         for(size_t i=0;i<words.size();++i){
             if(!words[i].empty()){ w2.push_back(words[i]); wo2.push_back(wordsOrig[i]); }
         }
         words.swap(w2); wordsOrig.swap(wo2);
     }
-    // 2) remove qualquer “palavra” idêntica a uma linha da grade
-    {
-        unordered_set<string> linhas(grid.begin(), grid.end());
-        vector<string> w2, wo2;
-        for(size_t i=0;i<words.size();++i){
-            if(linhas.find(words[i])==linhas.end()){ w2.push_back(words[i]); wo2.push_back(wordsOrig[i]); }
-        }
-        words.swap(w2); wordsOrig.swap(wo2);
-    }
-    // -----------------------------------------------------------
+    // (REMOVIDO) Nao descartar palavras iguais a linhas da grade
 
-    // busca paralela
+    // busca paralela (1 thread por palavra)
     vector<Found> results(words.size());
-    mutex res_mtx;
     vector<vector<bool>> upperMask(R, vector<bool>(C,false));
     vector<thread> ts;
+    ts.reserve(words.size());
 
     for(size_t i=0;i<words.size();++i){
         ts.emplace_back([&, i](){
             Found f = findWord(gridLower, words[i]);
-            lock_guard<mutex> lk(res_mtx);
+            // Sem mutex: cada thread grava apenas em results[i]
             results[i] = f;
             results[i].word = wordsOrig[i];
         });
@@ -209,10 +244,10 @@ int main(int argc, char** argv){
     for(size_t i=0;i<results.size();++i){
         const auto& f = results[i];
         if(f.found){
-            cout << wordsOrig[i] << " - (" << (f.start.r+1) << "," << (f.start.c+1) << "):" << f.dir << "\n";
+            cout << results[i].word << " - (" << (f.start.r+1) << "," << (f.start.c+1) << "):" << f.dir << "\n";
         }else{
-            if(!wordsOrig[i].empty())
-                cout << wordsOrig[i] << ": nao encontrada\n";
+            if(!results[i].word.empty())
+                cout << results[i].word << ": nao encontrada\n";
         }
     }
     return 0;
