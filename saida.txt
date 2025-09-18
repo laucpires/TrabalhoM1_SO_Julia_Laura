@@ -1,10 +1,10 @@
 runkffxscslvqwvtvfolwymmxPROCESSOSlkqoifheurjzqbdlpybntwiblv
 xjhjguvykdfrjzltbbweoldpyIymizzdyinjqjfoukvluuypvancozhgzfuk
-htphdcttoyjiketgysvwujakkPhslomvxhlfmpyfdyqniuhpvbmtxvtjhact
+htphdcttoyjiketgysvwujakkPhsCELSOdlfmpyfdyqniuhpvbmtxvtjhact
 qqooaTbvmttswtkkdftscwhvvEeoemqifgztuzxplqkfofqyjxtdzrkumpkt
 bcbgkHabfbywnojsdokdxhzbgqncfcoyfqblbcpidngserlhgxmfflileyql
 aejivRkvyokguyomSINAISegznoxzvcneptcfeeknmhzifqunkudyyjylxxn
-tbazqEtdyxhkmwrOngydanpvqotcohbluwmuvcpacokmagfpoftoukjlyfpo
+tbazqEtdyxhkmwrOSINCRONISMOcohbluwmuvcpacokmagfpoftoukjlyfpo
 mqzinAlckqtlshVvhjdoyruthogrbeyqtmjuuwgyiyrvsaszjvqjokfwalpc
 rpumbDdhvbpvmInmhhoahzvzimjpilazpsokeppnmtchfrvmzjoikmhXsyqk
 ibkhtSevdlkuUyyndfuuajtlxbvjiphazpemyxstcdfwedmhkgbmpvzEpwuy
@@ -13,12 +13,11 @@ tiuhxheviyRglughhvbwubpvjbddqkglfofmnmqivqrgkxpuutqpuhmUdiri
 ydojieqwsAdpcahtistxonqeemnsrvjzvmphwuxtociqcpkmjfmzsedMzrsr
 indklrzsotphhurayiklurxtjdzkurefhhpsyokmkbvtvotuzfhtweoihpse
 hwlqdaaiequsavoutenpdvwyrcnzjespnqadwcnathstfipanfpqalrrngry
-thrxfdsklqybqdxvrzoasjfabfpgwiihzbufuvrflpjbtgykimmaysczzsfw
-
-threads - (4,6):baixo
-arquivos - (13,10):cima-direita
-sinais - (6,17):direita
-pipe - (1,26):baixo
-processos - (1,26):direita
-mutex - (13,56):cima
-sincronismo: nao encontrada
+threads – (4,6):baixo
+arquivos – (13,10):cima-direita
+celso – (3,29):direita
+sinais – (6,17):direita
+pipe – (1,26):baixo
+processos – (1,26):direita
+mutex – (13,56):cima
+sincronismo – (7,17):direita

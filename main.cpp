@@ -6,19 +6,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
-
 using namespace std;
 
-struct Pos { int r, c; };
-struct Found {
-    string word;
-    Pos start{};
-    string dir;
-    vector<Pos> path;
-    bool found = false;
-};
-
-// 8 direções (inclui diagonais)
 const vector<pair<pair<int,int>, const char*>> DIRS = {
     {{ 0,  1}, "direita"},
     {{ 0, -1}, "esquerda"},
@@ -30,225 +19,191 @@ const vector<pair<pair<int,int>, const char*>> DIRS = {
     {{-1, -1}, "cima-esquerda"}
 };
 
+// Representa uma posição no grid (linha r, coluna c)
+struct Pos { int r, c; };
+// Estrutura que guarda o resultado da busca de uma palavra
+struct Found {
+    string word;        // palavra buscada
+    Pos start{};        // posição inicial (linha,coluna)
+    string dir;         // direção encontrada (ex: "direita/cima")
+    vector<Pos> path;   // todas as coordenadas da palavra no grid
+    bool found = false; // se foi encontrada ou não
+};
+// Verifica se uma posição (r,c) está dentro dos limites do grid
 static inline bool inBounds(int r,int c,int R,int C){
     return r>=0 && r<R && c>=0 && c<C;
 }
-
+// Tenta casar a palavra 'w' no grid 'g' começando da posição (r,c)
+// avançando na direção (dr,dc). Se casar, retorna true e preenche o path.
 static bool matchFrom(const vector<string>& g, const string& w,
-                      int r,int c,int dr,int dc, vector<Pos>& path){
-    const int R = (int)g.size();
-    const int C = (int)g[0].size();
+                      int r,int c,int dr,int dc, vector<Pos>& path) {
+    int R = (int)g.size();
+    int C = (int)g[0].size();
     path.clear();
-
-    // Otimização: verifica se a última letra ainda cabe no grid
-    int end_r = r + (int(w.size()) - 1) * dr;
-    int end_c = c + (int(w.size()) - 1) * dc;
-    if (!inBounds(end_r, end_c, R, C)) return false;
-
-    for(int i=0;i<(int)w.size();++i){
-        int rr=r+i*dr, cc=c+i*dc;
-        if(g[rr][cc]!=w[i]) return false;
-        path.push_back({rr,cc});
+    // Calcula onde a palavra terminaria
+    int end_r = r + ((int)w.size() - 1) * dr;
+    int end_c = c + ((int)w.size() - 1) * dc;
+    if (!inBounds(end_r, end_c, R, C)) return false; // sairia do grid
+    // Verifica caractere por caractere
+    for(int i=0; i<(int)w.size(); ++i) {
+        int rr = r + i*dr, cc = c + i*dc;
+        if(g[rr][cc] != w[i]) return false; // falhou
+        path.push_back({rr, cc});
     }
     return true;
 }
-
-static string dirName(int dr,int dc){
-    for (auto& d : DIRS)
-        if (d.first.first==dr && d.first.second==dc) return d.second;
+// Função para retornar o nome da direção usando o vetor DIRS
+static string getDirName(int dr, int dc) {
+    for(const auto& dir : DIRS) {
+        if(dir.first.first == dr && dir.first.second == dc) {
+            return dir.second;
+        }
+    }
     return "?";
 }
-
+// Procura uma palavra (normal ou invertida) no grid
+// Retorna a posição inicial, direção e caminho se encontrada
 static Found findWord(const vector<string>& gridLower, const string& wLower){
-    const int R=(int)gridLower.size();
-    const int C=(int)gridLower[0].size();
-
+    int R = (int)gridLower.size(), C = (int)gridLower[0].size();
     Found ans; ans.word = wLower;
+    // Também procura a palavra ao contrário
     string wRev = wLower; reverse(wRev.begin(), wRev.end());
-
-    for(int r=0;r<R;++r){
-        for(int c=0;c<C;++c){
+    // Varre todas as posições do grid
+    for(int r=0; r<R; ++r){
+        for(int c=0; c<C; ++c){
             char ch = gridLower[r][c];
+            // Só tenta se a letra inicial bater
             if(ch!=wLower[0] && ch!=wRev[0]) continue;
-
-            for (auto& d : DIRS){
-                vector<Pos> path;
-                int dr=d.first.first, dc=d.first.second;
-                if (matchFrom(gridLower, wLower, r, c, dr, dc, path)){
-                    ans.found=true; ans.start={r,c}; ans.dir=d.second; ans.path=path; return ans;
-                }
-            }
-            for (auto& d : DIRS){
-                vector<Pos> path;
-                int dr=d.first.first, dc=d.first.second;
-                if (matchFrom(gridLower, wRev, r, c, dr, dc, path)){
-                    reverse(path.begin(), path.end());
-                    ans.found=true; ans.start=path.front();
-                    ans.dir = dirName(-dr, -dc);
-                    ans.path=path; return ans;
+            // Testa todas as 8 direções
+            for(int dr=-1; dr<=1; ++dr){
+                for(int dc=-1; dc<=1; ++dc){
+                    if(dr==0 && dc==0) continue;
+                    vector<Pos> path;
+                    // Caso palavra "normal"
+                    if(matchFrom(gridLower, wLower, r, c, dr, dc, path)){
+                        ans.found=true;
+                        ans.start={r,c};
+                        ans.dir=getDirName(dr,dc);
+                        ans.path=path;
+                        return ans;
+                    }
+                    // Caso palavra invertida
+                    if(matchFrom(gridLower, wRev, r, c, dr, dc, path)){
+                        reverse(path.begin(), path.end());
+                        ans.found=true;
+                        ans.start=path.front();
+                        ans.dir=getDirName(-dr,-dc); // direção invertida
+                        ans.path=path;
+                        return ans;
+                    }
                 }
             }
         }
     }
     return ans;
 }
-
-// Lê: R C, depois R linhas, depois palavras (uma por linha ou separadas por espaço)
-static bool readSingleFile(istream& in, vector<string>& grid, vector<string>& words){
-    int R,C; 
-    if(!(in>>R>>C)) return false;
-    string line; getline(in,line); // consome resto
-    grid.clear(); words.clear();
-
-    for(int i=0;i<R;++i){
-        if(!getline(in,line)) return false;
-        // remove todos os espaços em branco
-        line.erase(remove_if(line.begin(), line.end(), [](unsigned char ch){return std::isspace(ch)!=0;}), line.end());
-        if((int)line.size()!=C) return false;
-        grid.push_back(line);
-    }
-    while(getline(in,line)){
-        string cur;
-        for(char ch: line){
-            if(isspace((unsigned char)ch)){
-                if(!cur.empty()){ words.push_back(cur); cur.clear(); }
-            }else cur.push_back(ch);
-        }
-        if(!cur.empty()) words.push_back(cur);
-    }
-    return true;
-}
-
-// Lê dois arquivos: grade (R C + R linhas) e lista (uma por linha)
-static bool readTwoFiles(const string& gridFile,const string& wordsFile,
-                         vector<string>& grid, vector<string>& words){
-    ifstream ig(gridFile);
-    if(!ig) return false;
-    // Lê apenas a grade do primeiro arquivo
-    if(!readSingleFile(ig, grid, words)) return false;
-
-    // Lê palavras do segundo arquivo (se existir)
-    ifstream iw(wordsFile);
-    if(iw){
-        words.clear();
-        string w, tok;
-        while(getline(iw,w)){
-            tok.clear();
-            for(char ch:w){
-                if(isspace((unsigned char)ch)){
-                    if(!tok.empty()){ words.push_back(tok); tok.clear(); }
-                }else tok.push_back(ch);
-            }
-            if(!tok.empty()) words.push_back(tok);
-        }
-    }
-    return true;
-}
-
 int main(int argc, char** argv){
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-
-    if (argc>=2 && std::string(argv[1])=="--help") {
-        cerr << "Uso:\n"
-             << "  " << argv[0] << "                (le de stdin: R C, R linhas da grade e depois palavras)\n"
-             << "  " << argv[0] << " arquivo.txt     (R C + grade + palavras no mesmo arquivo)\n"
-             << "  " << argv[0] << " grade.txt palavras.txt\n";
-        return 0;
-    }
-
-    vector<string> grid, words;
-    if(argc==1){
-        if(!readSingleFile(cin, grid, words)){
-            cerr<<"Erro ao ler entrada do stdin.\n"; 
-            return 1;
-        }
-    }else if(argc==2){
-        ifstream in(argv[1]);
-        if(!in || !readSingleFile(in, grid, words)){
-            cerr<<"Erro ao ler arquivo: "<<argv[1]<<"\n"; 
-            return 1;
-        }
-    }else{
-        if(!readTwoFiles(argv[1], argv[2], grid, words)){
-            cerr<<"Erro ao ler arquivos: "<<argv[1]<<" e/ou "<<argv[2]<<"\n"; 
-            return 1;
-        }
-    }
-
-    // Robustez: checa grid
-    if (grid.empty() || grid[0].empty()){
-        cerr << "Erro: grade vazia ou dimensoes invalidas.\n";
+    // Checagem dos argumentos
+    if(argc!=2){
+        cerr << "Uso: " << argv[0] << " cacapalavras.txt\n";
         return 1;
     }
-
-    const int R=(int)grid.size();
-    const int C=(int)grid[0].size();
-
-    // grade minúscula
-    vector<string> gridLower = grid;
-    for(auto& row: gridLower) 
-        for(char& ch: row) ch=(char)tolower((unsigned char)ch);
-
-    // preserva originais e normaliza minúsculas
-    vector<string> wordsOrig = words;
-    for(auto& w: words){
-        string t; 
-        for(char ch:w) if(!isspace((unsigned char)ch)) t.push_back((char)tolower((unsigned char)ch));
-        w = t;
+    ifstream in(argv[1]);
+    if(!in){
+        cerr<<"Erro ao abrir arquivo: "<<argv[1]<<"\n";
+        return 1;
     }
-
-    // --- filtros seguros ---
-    // 1) remove palavras vazias
-    {
-        vector<string> w2, wo2;
-        w2.reserve(words.size()); wo2.reserve(wordsOrig.size());
-        for(size_t i=0;i<words.size();++i){
-            if(!words[i].empty()){ w2.push_back(words[i]); wo2.push_back(wordsOrig[i]); }
+    // Lê dimensões do grid
+    int R, C;
+    in >> R >> C;
+    string line;
+    getline(in, line); // consome o resto da linha
+    // Lê o grid de letras
+    vector<string> grid;
+    for(int i=0; i<R; ++i){
+        getline(in, line);
+        // Remove espaços em branco
+        line.erase(remove_if(line.begin(), line.end(), 
+                  [](unsigned char ch){return isspace(ch)!=0;}), line.end());
+        // Valida tamanho da linha
+        if((int)line.size() != C){
+            cerr << "Erro: linha " << (i+1) << " não tem tamanho correto\n";
+            return 1;
         }
-        words.swap(w2); wordsOrig.swap(wo2);
+        grid.push_back(line);
     }
-    // (REMOVIDO) Nao descartar palavras iguais a linhas da grade
-
-    // busca paralela (1 thread por palavra)
+    // Lê lista de palavras (resto do arquivo)
+    vector<string> words;
+    vector<string> wordsOrig;
+    while(getline(in, line)){
+        if(line.empty()) continue;
+        string cur;
+        for(char ch : line){
+            if(isspace((unsigned char)ch)){
+                if(!cur.empty()){
+                    wordsOrig.push_back(cur);
+                    string t;
+                    for(char cc : cur) t += (char)tolower((unsigned char)cc);
+                    words.push_back(t);
+                    cur.clear();
+                }
+            } else cur.push_back(ch);
+        }
+        if(!cur.empty()){
+            wordsOrig.push_back(cur);
+            string t;
+            for(char cc : cur) t += (char)tolower((unsigned char)cc);
+            words.push_back(t);
+        }
+    }
+    // Validação do grid
+    if(grid.empty() || grid[0].empty()){
+        cerr << "Erro: grid vazio ou dimensões inválidas.\n";
+        return 1;
+    }
+    // Cria versão minúscula do grid para busca
+    vector<string> gridLower = grid;
+    for(auto& row: gridLower)
+        for(char& ch: row) ch = (char)tolower((unsigned char)ch);
+    // Vetor de resultados e máscara para destacar letras encontradas
     vector<Found> results(words.size());
-    vector<vector<bool>> upperMask(R, vector<bool>(C,false));
+    vector<vector<bool>> upperMask(R, vector<bool>(C, false));
+    // Cria uma thread para cada palavra (busca paralela)
     vector<thread> ts;
     ts.reserve(words.size());
-
-    for(size_t i=0;i<words.size();++i){
+    for(size_t i=0; i<words.size(); ++i){
         ts.emplace_back([&, i](){
             Found f = findWord(gridLower, words[i]);
-            // Sem mutex: cada thread grava apenas em results[i]
             results[i] = f;
-            results[i].word = wordsOrig[i];
+            results[i].word = wordsOrig[i]; // mantém original
         });
     }
     for(auto& t: ts) t.join();
-
-    // aplica maiúsculas nas letras encontradas
+    // Marca letras encontradas para transformar em maiúsculas
     for(const auto& f: results){
         if(!f.found) continue;
-        for(const auto& p: f.path) upperMask[p.r][p.c] = true;
-    }
-    vector<string> out = grid;
-    for(int r=0;r<R;++r)
-        for(int c=0;c<C;++c)
-            if(upperMask[r][c]) out[r][c]=(char)toupper((unsigned char)out[r][c]);
-
-    // imprime matriz destacada
-    for(const auto& row: out) cout<<row<<"\n";
-    cout << "\n";
-
-    // imprime lista (1-based)
-    for(size_t i=0;i<results.size();++i){
-        const auto& f = results[i];
-        if(f.found){
-            cout << results[i].word << " - (" << (f.start.r+1) << "," << (f.start.c+1) << "):" << f.dir << "\n";
-        }else{
-            if(!results[i].word.empty())
-                cout << results[i].word << ": nao encontrada\n";
+        for(const auto& p: f.path) {
+            if(inBounds(p.r, p.c, R, C)) {
+                upperMask[p.r][p.c] = true;
+            }
         }
     }
-    return 0;
+    // Cria saída final (grid com letras encontradas em maiúsculo)
+    vector<string> out = grid;
+    for(int r=0; r<R; ++r)
+        for(int c=0; c<C; ++c)
+            if(upperMask[r][c]) out[r][c] = (char)toupper((unsigned char)out[r][c]);
+    // Mostra grid processado
+    for(const auto& row: out) cout << row << endl;
+    // Mostra resultado da busca palavra por palavra
+    for(size_t i=1; i<results.size(); ++i){
+        const auto& f = results[i];
+        if(f.found){
+            cout << f.word << " – (" << (f.start.r+1) << "," << (f.start.c+1) << "):" << f.dir << endl;
+        } else if(!f.word.empty()){
+            cout << f.word << ": não encontrada" << endl;
+        }
+    }
 }

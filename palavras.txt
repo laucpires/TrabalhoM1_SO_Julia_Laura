@@ -1,7 +1,0 @@
-threads
-arquivos
-sinais
-pipe
-processos
-mutex
-sincronismo
